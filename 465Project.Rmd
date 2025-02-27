@@ -1,0 +1,205 @@
+---
+author: Brandon Keck and Arthur Jones
+title: "465 Project"
+output: html_document
+date: "2024-04-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r, libraries, include = FALSE}
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+```
+
+```{r, eval=FALSE, warning=FALSE}
+install.packages("tidyverse")
+install.packages("car")
+install.packages("olsrr")
+install.packages("GGally")
+```
+
+```{r, results = FALSE}
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+library(GGally)
+library(car)
+library(olsrr)
+```
+
+## Abstract
+Understanding the factors influencing Major League Baseball (MLB) player performance is crucial for team management and player development. In this study, we employed  advanced statistical modeling techniques in order to predict ROTO, a comprehensive measure of player performance, based on several key metrics including slugging percentage (slg), at-bats (AB), home runs (HR), and hits (H). The linear regression model revealed a significant association between player performance and each of the predictor variables. Specifically, at-bats, home runs, and hits exhibited strong positive associations with ROTO, indicating that players with more opportunities at the plate and higher batting success tend to have higher overall performance scores. However, the slugging percentage did not demonstrate a significant association with ROTO in this model. The model achieved an impressive R-squared value of 0.9571, suggesting that approximately 95.71% of the variability in ROTO can be explained by the combination of at-bats, home runs, and hits. These findings highlight the importance of considering various performance metrics when assessing MLB player performance and underscore the potential of advanced statistical modeling techniques in talent evaluation and player development. 
+Building upon these initial findings, we extended our analysis by incorporating a quadratic term for at-bats (AB^2) into the regression model.This advanced model demonstrated an improved fit, with a higher adjusted R-squared value with a lower residual standard error compared to our previous model. Our results revealed a significant nonlinear relationship between at-bats and ROTO. What this suggests is that at-bats may have a nonlinear relationship as the number of at-bats increases.
+
+
+## Inroduction
+For our project, we looked at a dataset provided by Baseball Guru that contains the hitting stats for all players during the 2022 MLB season. The dataset contains 49 different variables for 689 observations. The variables in the dataset are all offensive metrics that include counting stats that accumulate over the season as well as percentages of other advanced stats. The dataset also includes categorical variables that describe each player based on team, batting preference, etc., but we decided on using mostly numerical data. The variables that we focused on include Home Runs (HR), Slugging Percentage (SLG), Hits (H), At Bats (AB), and ROTO. ROTO is short for Rotisserie, which is the name of the baseball fantasy format where each player is assigned a dollar value based on their overall performance. Since sports betting is becoming more relevant day by day, we wanted to create a simpler model that could best be used to calculate the ROTO variable. By calculating the ROTO variable, we can also get insight on how certain teams could potentially work out player contracts and values. ROTO works very similar to the MLB, as there is a certain budget your team has (even though there is no true salary cap in the MLB). Each team has a set dollar amount they are willing to spend and they will, among other factors, use statistical data to produce a value which they consider spending to add that player to their roster. We are both very into the ins-and-outs of the baseball world, so we decided that creating our own models would be a great place to start.
+
+```{r}
+mlb <- read_csv("~/Desktop/465 Prject/bat2022.csv")
+```
+```{r}
+mlb$slg <- as.numeric(mlb$slg)
+mlb$lg <- as.factor(mlb$lg)
+mlb$avg <- as.numeric(mlb$avg)
+mlb$obp <- as.numeric(mlb$obp)
+```
+
+```{r, fig.show='show', message = FALSE}
+mlb <- mlb %>% mutate(judge =
+                        case_when(
+                          playerID == "judgeaa01" ~ 1,
+                          playerID == "leekh01" ~ 2,
+                          playerID == "trompch01" ~ 3,
+                          .default = 0 
+                        ))
+```
+
+```{r, fig.show='show', message = FALSE}
+# this next line ensures the labels I want are used for the new factor variable. Also note that before you run the next line, judge is a numeric variable.
+mlb$judge = factor(mlb$judge,
+                   levels = c(0,1,2,3),
+                   labels = c("other", "Judge", "Lee", "Tromp"))
+```
+
+# Model 1 (ROTO ~ SLG)
+For our very first model, we looked at the relationship between slugging percentage (SLG) and ROTO. 
+	Hypothesis Tests
+H0: There is no linear relationship between the slugging percentage and ROTO in MLB.
+HA: There is a linear relationship between slugging percentage and ROTO in MLB.
+
+```{r, fig.show='show', message = FALSE}
+#This creates a scatter plot of SLG VS ROTO
+ggplot(data = mlb, aes(x = slg, y = ROTO, color = judge)) +
+  geom_point() +
+  labs(x = "SLG", y = "ROTO", title = "SLG vs ROTO") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_manual(values = c("other" = "black",
+                                "Judge" = "hotpink",
+                                "Lee" = "limegreen",
+                                "Tromp" = "red"),
+                     breaks = c("Judge", "Lee", "Tromp" )) +
+  labs(color='Athlete')
+#This prints out the summary of model of SLG vs ROTO
+model <- lm(ROTO ~ slg, data = mlb)
+summary(model)
+```
+
+After running an F-test of our model, we see that our F-statistic is 227.2 on 1 and 659 degrees of freedom, and our p-value is essentially 0 (2.2e^-16). Therefore, we can conclude that there is a significant relationship between slugging percentage and ROTO. We also get a residual standard error of 8.103 on 659 df, which is fairly low. However, looking at the R^2 value, we see that it is only .2552, meaning that only 25.52% of the variation in ROTO can be explained by slugging percentage. Therefore, we would conclude that even though our results are significant, this would not be a very good model to use, at least by itself. We should experiment further by adding more variables to the model.
+
+```{r, fig.show='show', message = FALSE}
+#This creates a scatter plot of AB vs ROTO
+ggplot(data = mlb, aes(x = AB, y = ROTO, color = judge)) +
+  geom_point() +
+  labs(x = "AB", y = "ROTO", title = "AB vs ROTO") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_manual(values = c("other" = "black",
+                                "Judge" = "hotpink",
+                                "Lee" = "limegreen",
+                                "Tromp" = "red"),
+                     breaks = c("Judge", "Lee", "Tromp" )) +
+  labs(color='Athlete')
+#This prints out the summary of the model1 AB vs ROTO
+model1 <- lm(ROTO ~ slg + AB, data = mlb)
+summary(model1)
+#This is the nested F-test of model and model1
+anova(model, model1)
+```
+
+# Model 2 (ROTO ~ SLG + AB + HR)
+After experimenting with models with multiple variables, we then looked at the relationship between slugging percentage (SLG), at-bats (AB), and home runs (HR) in terms of ROTO.
+Hypothesis Tests
+H0: There is no linear relationship between the slugging percentage, at-bats and home runs vs ROTO in MLB.
+HA: There is a linear relationship between slugging percentage, at-bats, and home runs  vs ROTO in MLB.
+
+```{r, fig.show='show', message = FALSE}
+#This creates a scatter plot of HR vs ROTO
+ggplot(data = mlb, aes(x = HR, y = ROTO, color = judge)) +
+  geom_point() +
+  labs(x = "HR", y = "ROTO", title = "HR vs ROTO") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_manual(values = c("other" = "black",
+                                "Judge" = "hotpink",
+                                "Lee" = "limegreen",
+                                "Tromp" = "red"),
+                     breaks = c("Judge", "Lee", "Tromp" )) +
+  labs(color='Athlete')
+#Summary of model2
+model2 <- lm(ROTO ~ slg + AB + HR, data = mlb)
+summary(model2)
+#Nested F-test of model1 and model2
+anova(model1, model2)
+```
+
+
+After running an F-test of our model, we see that our F-statistic is 1022 on 3 and 657 degrees of freedom, and our p-value is again essentially 0 (2.2e^-16). Therefore, we can conclude that there is a significant relationship between slugging percentage, at bats, home runs, and ROTO. We get a residual standard error of 3.953 on 657 df, which is again lower than our first model. Looking at the R^2 value, we see it is now .8227, meaning that 82.27% of the variation in ROTO can be explained by slugging percentage, at bats, and home runs. This model is a significant improvement over our previous model, as our R-squared value jumped by over .5. We went from only 25% of the variation being explained to over 82% of the variation being explained by adding in more potential predictor variables. This is a good model, as the results are significant and we receive a high R-squared value. However, by substituting in even more variables, we could get an even higher R-squared value.
+
+# Model 3 (ROTO ~ SLG + AB + HR + H)
+	One of our best prediction models up to date looks at the relationship between slugging percentage (SLG), at-bats (AB), home runs (HR), and hits (H) in terms of ROTO. 
+	Hypothesis Tests
+H0: There is no linear relationship between the slugging percentage, at-bats, home runs and hits vs ROTO in MLB.
+HA: There is a linear relationship between slugging percentage, at-bats, and home runs, and hits  vs  ROTO in MLB.
+
+```{r, fig.show='show', message = FALSE}
+#This creates a scatter plot of H vs ROTO
+ggplot(data = mlb, aes(x = H, y = ROTO, color = judge)) +
+  geom_point() +
+  labs(x = "H", y = "ROTO", title = "H vs ROTO") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_manual(values = c("other" = "black",
+                                "Judge" = "hotpink",
+                                "Lee" = "limegreen",
+                                "Tromp" = "red"),
+                     breaks = c("Judge", "Lee", "Tromp" )) +
+  labs(color='Athlete')
+#This prints out the summary of model3
+model3 <- lm(ROTO ~ slg + AB + HR + H, data = mlb)
+summary(model3)
+#This prints out the nested F-test between model2 and model3
+anova(model2, model3)
+```
+
+
+After running an F-test on our model, we see that our F-statistic is 3655 on 4 and 656 degrees of freedom, and our p-value is again essentially 0 (2.2e^-16).  Therefore, we can conclude that there is a significant relationship between slugging percentage, at bats, home runs, hits and ROTO.  We get a residual standard error of 1.952 on 656 df, which is once again lower than our previous model.  Looking at the R^2 value, we see it is now .9568, meaning that 95.68% of the variation in ROTO can be explained by slugging percentage, at bats, home runs, and hits. Though this model doesn’t have as big of a jump as the previous model, there is still significant improvement in our R-squared value. 95.68% of our variation is now accounted for by our variables, meaning that there isn’t too much more we could add that would significantly improve our model. This is a great model, as our results are significant and we receive a very high R-squared value. The goal at this point would be to start adding potential interaction terms to see if we can push the R-squared even higher, and to potentially remove variables that could be collinear. 
+
+
+# Model 5 (ROTO ~ SLG + AB + HR + H + I(AB)^2)
+
+After finding our best model using a combination of different variables, we added an interaction term to try and raise our R-squared value. In this model, we looked at the relationship between slugging percentage (SLG), at-bats (AB), home runs (HR), and hits (H) in terms of ROTO, but also added an interaction term for at-bats.
+	Hypothesis Tests
+H0: There is no linear relationship between the slugging percentage, at-bats, home runs, hits, and (at-bats)^2 vs ROTO in MLB.
+HA: There is a linear relationship between slugging percentage, at-bats, home runs, hits and (at-bats)^2  vs ROTO in MLB.
+
+```{r, fig.show='show', message = FALSE}
+model5 <- lm(ROTO ~ slg + AB + HR + H + I(AB^2), data = mlb)
+summary(model5)
+```
+
+After running an F-test on our model, we see that our F-statistic is 3000 on 5 and 655 degrees of freedom, and our p-value is once again essentially 0 (2.2e^-16). Therefore, we can conclude that there is a significant relationship between slugging percentage, at bats, home runs, hits and ROTO with our at-bats interaction term.  We get a residual standard error of 1.928 on 656 df, which is slightly lower than our previous model. Looking at the R^2 value, we see it is now .9578, meaning that 95.78% of the variation in ROTO can be explained by slugging percentage, at bats, home runs, hits, and the at-bats interaction term. This model only increases our R-squared by .001, but since our R-squared is already very high, this slight increase is significant. To improve this model, we can look for other potential interaction terms, as well as check for collinearity to see if there are unwanted relationships between our predictor variables.
+
+
+
+
+# Conclusion
+
+After looking at numerous models, our current best model looks at the relationship between slugging percentage (SLG), at-bats (AB), home runs (HR), and hits (H) in terms of ROTO, with an interaction term for at-bats. We got a p-value of .9578, which is fairly close to one. 95.78% of our variation in ROTO can be explained by the variables, so our model would be a very good predictor of the ROTO variable. Our residual standard error is also low, so we can expect our results to be accurate. However, there is more work that can be done to improve our models. When looking at the nested F-test for our best model, we found that slugging percentage was no longer significant in our calculations. Therefore, the next steps would be removing it from that specific model. However, that only applies to that specific test, as slugging percentage could still be significant in other future models. Another potential issue with our model is collinearity. After looking at the Variance Inflation Factor (VIF). We see that some of our predictor variables are collinear, which can lead to problems when trying to examine the true effect of each predictor variable on the response variable. 
+
+
+
+```{r, fig.show='show', message = FALSE}
+# Create a new data frame with selected variables
+mlb_subset <- mlb[, c("slg", "AB", "HR", "H")]
+
+vif(model5)
+# Create scatterplot matrix using ggpairs
+ggpairs(data = mlb_subset)
+ols_step_both_p(model5)
+```
+
+# Reflection
+
+We decided to use the certain variables from the spreadsheet because we believed that these are some of the most well-known and understood parts of baseball. Not everyone would understand the complex underlying stats that a baseball junkie would know, but variables such as home runs and hits are variables that most people either know or would be able to easily understand. We strived to make a simple model that would be useful to the most people possible. We also used variables that had some sort of relationship with one another, though it does pose a problem once we learned that we don’t want collinearity. Many classes in the past have helped us, whether it is learning R itself to learning how to make simple linear models and expanding on them. Our models also reflect why this course has a GE designation as you don’t need to have a lot of knowledge about baseball or statistics to understand what information the models are presenting and how that information could be useful.
+
